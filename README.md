@@ -16,13 +16,19 @@ $ cd build
 $ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=/usr/bin/clang++
 $ make
 ```
-This should produce an executable called `mstisolver`.
+This should produce an executable called `mstisolver`. If you have difficulties building or using the solver,
+feel free to contact Noah (contact details can be found in the paper).
 
 ## Usage
-The solver accepts instances described in a simple text format, which is described in the **Input Format** section below.
-Many instances are provided in the `instances.tar.zst` file, with the file extension `.msti`. Files with the `.ans` extension
-contain a single integer describing the optimal solution weight for the corresponding `.msti` file.
-We assume that you have extracted `instance.tar.zst` to a directory called `instances`.
+The solver accepts instances in a simple text format, which is described in the **Input Format** section below.
+We assume that you have extracted `instance.tar.zst` to a directory called `instances`, by using the following command (or similar)
+in the root directory of the repo:
+```
+$ tar --zstd -xvf instances.tar.zst
+```
+Many instances are provided in the `instances` directory, with the file extension `.msti`. Files with the `.ans` extension
+contain a single integer describing the optimal solution weight for the corresponding `.msti` file. If the `.ans` file
+is missing, it means that the instance could not be solved within 1 hour by the test machine used in the paper.
 
 For example, to solve the instance `instances/small/10.5.1.msti`:
 ```
@@ -52,7 +58,9 @@ For the full list, run
 ```
 $ build/mstisolver --help
 ```
-There is also a simple testing script included called run_tests.py, which can be used to solve many instances and record timing information into a JSON file. To use the script, you can edit the code at the bottom of the file to use the desired solvers, tests, and JSON file.
+There is also a simple testing script included called run_tests.py, which can be used to solve many instances and
+record timing information into a JSON file. To use the script, you can edit the code at the bottom
+of the file to use the desired solvers, tests, and JSON file.
 
 ## Input Format
 
@@ -101,10 +109,10 @@ min_spanning_tree 9386 # the minimum spanning tree weight of the graph
 dp_upper_bound_0 43256 # the weight of the DP upper bound with p=0
 dp_upper_bound_time_0 7.39384 # the time in milliseconds needed to compute the DP upper bound with p=0
 dp_upper_bound_1 43084 # the weight of the DP upper bound with p=1
-dp_upper_bound_time_1 12.5034 # the time in milliseconds needed to compute the DP upper bound with p=0
+dp_upper_bound_time_1 12.5034 # the time in milliseconds needed to compute the DP upper bound with p=1
 greedy_time 31.5881 # the time in milliseconds needed to compute the greedy lower bound
 greedy_lower_bound 31328 # the weight of the greedy lower bound
-dp_upper_bound_2 42180 # the time in milliseconds needed to compute the DP upper bound with p=2
+dp_upper_bound_2 42180 # the weight of the DP upper bound with p=2
 dp_upper_bound_time_2 20.5235 # ...
 dp_upper_bound_3 40877
 dp_upper_bound_time_3 25.7584
@@ -127,5 +135,5 @@ status ok # indicates that there was no error encountered
 wallclock_time 3512.87 # the total wall-clock time in milliseconds needed to solve the instance
 cpu_time 7014.9 # the total CPU time in milliseconds needed to solve the instance
 num_bnb_nodes 30440835 # the number of branch and bound nodes evaluated
-num_bnb_pruned 14351804 # the number of times a node was pruned in branch and bound. does not include children of pruned nodes.
+num_bnb_pruned 14351804 # the number of times a node was pruned in branch and bound (not including children of pruned nodes)
 ```
