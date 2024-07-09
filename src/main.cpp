@@ -22,7 +22,8 @@ void print_node_count(int sig) {
     OUT("num_bnb_nodes " << n_nodes << endl);
     OUT("num_bnb_pruned " << n_pruned << endl);
     signal(sig, SIG_DFL);
-    kill(getpid(), sig);
+    // kill(getpid(), sig);
+    _exit(0);
 }
 
 int main(int argc, char **argv) {
@@ -32,7 +33,8 @@ int main(int argc, char **argv) {
     bool quiet = false, use_file = false, write_canonical = false,
          write_instance = false,
          use_dp_ub = true, use_greedy = true, gen_inst = false,
-         use_canonicalize = true, use_binsearch = false;
+         use_canonicalize = true, use_binsearch = false,
+         dp_single_thread = false;
     int gen_n, gen_m, gen_max_lo_wt, gen_max_up_wt, rng_seed = -1;
     int cap_override = -1, r_override = -1;
     double cap_override_fraction = -1, r_override_fraction = -1;
@@ -85,6 +87,8 @@ int main(int argc, char **argv) {
                "disable DP upper bound",
            (option("-dp-cost-scale") & value("scale", dp_cost_scale)) %
                "scale down costs and capacity for DP bound",
+           (option("-dp-single-thread").set(dp_single_thread, true)) %
+               "use a single thread for everything (alternate between DP and BNB)",
            (option("-max-dp-prefix-bits") & value("bits", dp_prefix_bits)) %
                "maximum number of DP prefix bits to compute") %
               "dynamic programming upper bound") %
@@ -206,7 +210,8 @@ int main(int argc, char **argv) {
         KnapsackUpperBound *kp_ub = nullptr;
         if (use_dp_ub) {
             kp_ub = make_knapsack_ub(inst, dp_cost_scale, dp_prefix_bits+1);
-            kp_ub->compute_in_background();
+            if (!dp_single_thread)
+                kp_ub->compute_in_background();
         }
 
         // compute greedy lower bound
@@ -218,7 +223,7 @@ int main(int argc, char **argv) {
 
         Soln sol = mst;
         // solve with branch-and-bound
-        BranchAndBound bnb(inst, initial_lb, kp_ub);
+        BranchAndBound bnb(inst, initial_lb, kp_ub, dp_single_thread);
         signal(SIGTERM, print_node_count);
         signal(SIGINT, print_node_count);
         sol = bnb.solve();

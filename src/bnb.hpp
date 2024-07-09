@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -10,10 +11,11 @@
 
 struct BranchAndBound {
 public:
-    BranchAndBound(Instance &inst, Soln lb, KnapsackUpperBound *kp_ub, int64_t ub_ub = numeric_limits<int64_t>::min())
-        : inst(inst), knapsack_ub(kp_ub), is(inst), lb(lb), ub_ub(ub_ub) {
+    BranchAndBound(Instance &inst, Soln lb, KnapsackUpperBound *kp_ub, bool dp_single_thread, int64_t ub_ub = numeric_limits<int64_t>::min())
+        : inst(inst), knapsack_ub(kp_ub), is(inst), lb(lb), ub_ub(ub_ub), dp_single_thread(dp_single_thread) {
     }
     Soln solve() {
+        time_since_dp = high_resolution_clock::now();
         min_postfix.resize(inst.m());
         min_postfix[inst.m()-1] = inst.edge(inst.m()-1).up_wt;
         for (int i = inst.m()-2; i >= 0; i--)
@@ -33,9 +35,18 @@ private:
     int64_t ub_ub;
     uint64_t n_new_nodes = 0, n_new_pruned = 0;
     vector<int64_t> min_postfix;
+    bool dp_single_thread;
+    std::chrono::time_point<std::chrono::high_resolution_clock> time_since_dp;
+    double switching_time = 0.01;
 };
 
 void BranchAndBound::branch(int i, int64_t rem_cap, int prefix) {
+    if (dp_single_thread && high_resolution_clock::now() - time_since_dp > std::chrono::milliseconds(int(switching_time*1000))) {
+        LOG("+ " + std::to_string(switching_time) + "s elapsed, switching from BNB to DP..." << endl);
+        knapsack_ub->compute_for(switching_time);
+        time_since_dp = high_resolution_clock::now();
+        switching_time *= 2;
+    }
     n_nodes++;
     n_new_nodes++;
 

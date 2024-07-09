@@ -16,6 +16,7 @@ using namespace std::chrono;
 struct KnapsackUpperBound {
     virtual ~KnapsackUpperBound() {};
     virtual void compute_in_background() = 0;
+    virtual void compute_for(double secs) = 0;
     virtual int64_t get_bound(int i, int r, int prefix) = 0;
     virtual int baseline_weight() = 0;
     virtual int prefix_bits_computed() = 0;
@@ -49,10 +50,38 @@ public:
     }
     virtual ~KnapsackUpperBoundT() {
         _should_quit.store(true);
-        _thread.join();
+        if (_thread.joinable())
+            _thread.join();
     }
     void compute_in_background() override {
         _thread = thread(&KnapsackUpperBoundT::compute_thread, this);
+    }
+    void compute_for(double secs) override {
+        _should_quit.store(false);
+        if (_thread.joinable())
+            _thread.join();
+        int64_t root_bound = numeric_limits<int64_t>::max();
+        _thread = thread([this, secs](){
+                             std::this_thread::sleep_for(std::chrono::milliseconds(int(secs*1000)));
+                             this->_should_quit.store(true);
+                         });
+        for (int bits = _bits_computed.load() + 1; bits < max_bits; bits++) {
+            uint64_t size = uint64_t(cap+1)*_k*(1ull<<bits)*sizeof(T);
+            LOG("+ computing dp upper bound with " << bits << " prefix bits..." << endl);
+            if (3*size > MEM_LIMIT) { // 3 because it's the previous + next size of dp+delta tables, and previous is half the size
+                LOG("+ hit memory limit for DP tables" << endl);
+                return;
+            }
+            auto start_time = high_resolution_clock::now();
+            root_bound = min(root_bound, compute(bits));
+            if (_should_quit.load(memory_order_relaxed)) {
+                LOG("+ DP yielding to BNB..." << endl);
+                return;
+            }
+            OUT("dp_upper_bound_" << bits << " " << root_bound << endl);
+            auto end_time = high_resolution_clock::now();
+            OUT("dp_upper_bound_time_" << bits << " " << duration<double, std::milli>(end_time - start_time).count() << std::endl);
+        }
     }
     int64_t compute(int bits = 0) {
         ASSERT(_bits_computed.load() == bits-1);
@@ -67,7 +96,8 @@ public:
         // so we need a fence here to ensure that other threads will
         // definitely see the updated tables when they read _bits_computed.
         atomic_thread_fence(memory_order_seq_cst);
-        _bits_computed.store(bits);
+        if (!_should_quit.load(memory_order_relaxed))
+            _bits_computed.store(bits);
 
         return wt;
     }

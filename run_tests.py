@@ -60,15 +60,20 @@ def run_test(solver, test, timeout):
         if os.path.exists(output_file):
             result["status"] = "skip"
             return result
-            
+
+    def setlimits():
+        resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
+
+    start_walltime = time.time()
     start_cputime = resource.getrusage(resource.RUSAGE_CHILDREN)
     proc = subprocess.Popen([solver.filename, *solver.args, test.filename],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             #stderr=subprocess.PIPE,
-            universal_newlines=True)
+            universal_newlines=True,
+            preexec_fn=setlimits)
     try:
-        stdout_data, stderr_data = proc.communicate(timeout=timeout)
+        stdout_data, stderr_data = proc.communicate(timeout=timeout+100)
     except subprocess.TimeoutExpired:
         proc.terminate()
         stdout_data, stderr_data = proc.communicate()
@@ -77,6 +82,14 @@ def run_test(solver, test, timeout):
         end_cputime = resource.getrusage(resource.RUSAGE_CHILDREN)
         result["cpu_time"] = (end_cputime.ru_utime - start_cputime.ru_utime) * 1000
     proc.kill()
+
+    if proc.returncode == -9: # killed by rlimit cpu
+        stdout_data, stderr_data = proc.communicate()
+        result["status"] = ERR_TIMEOUT
+        end_cputime = resource.getrusage(resource.RUSAGE_CHILDREN)
+        end_walltime = time.time()
+        result["cpu_time"] = (end_cputime.ru_utime - start_cputime.ru_utime) * 1000
+        result["wallclock_time"] = (end_walltime - start_walltime) * 1000
 
     if result["status"] != ERR_TIMEOUT and proc.returncode != 0:
         result["status"] = ERR_RETCODE
@@ -120,7 +133,7 @@ def run_tests(solvers, tests, f, timeout=3):
     for solver in solvers:
         for test in tests:
             result = run_test(solver, test, timeout)
-            print(result["status"], "cpu time: ", result["cpu_time"])
+            print(result["status"], "cpu time: ", result["cpu_time"], "wallclock time: ", result["wallclock_time"])
             if result["status"] not in ["ok", "skip"]:
                 nfail += 1
             f.write(str(result) + "\n")
@@ -149,7 +162,7 @@ output_dir = "test_results"
 all_solvers = [
     Solver("build/mstisolver", ["-r-fraction", "0.05", "-dp-cost-scale", "100000", "-f"], EXACT),
     Solver("build/mstisolver", ["-r-fraction", "0.05", "-no-canonicalize", "-f"], EXACT),
-    Solver("build/mstisolver", ["-q", "-f"], EXACT),
+    Solver("build/mstisolver", ["-dp-single-thread", "-q", "-f"], EXACT),
 ]
 
 tests = get_all_tests()
@@ -160,10 +173,10 @@ bazgan2012efficient = list(filter(lambda t: "bazgan2012efficient" in t.filename,
 new = list(filter(lambda t: "new" in t.filename, tests))
 os.makedirs(output_dir, exist_ok=True)
 with open(output_dir + "/all_results", "a") as f:
-    run_tests([all_solvers[0]], wei2021_gen_tests, f, timeout=3600)
-    run_tests([all_solvers[0]], wei2021_real_tests, f, timeout=3600)
-    run_tests([all_solvers[2]], small, f, timeout=3600)
+    # run_tests([all_solvers[0]], wei2021_gen_tests, f, timeout=3600)
+    # run_tests([all_solvers[0]], wei2021_real_tests, f, timeout=3600)
+    # run_tests([all_solvers[2]], small, f, timeout=3600)
     # run_tests([all_solvers[2]], bazgan2012efficient, f, timeout=3600)
-    # run_tests([all_solvers[2]], new, f, timeout=60)
+    run_tests([all_solvers[2]], new, f, timeout=3600)
 
 print("\n{} FAILURES".format(nfail))
