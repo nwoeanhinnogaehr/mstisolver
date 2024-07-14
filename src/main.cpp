@@ -346,7 +346,7 @@ int main(int argc, char **argv) {
 
                 Soln sol = mst;
                 // solve with branch-and-bound
-                BranchAndBound bnb(msti_inst, initial_lb, kp_ub, inst.r()-1);
+                BranchAndBound bnb(msti_inst, initial_lb, kp_ub, false, inst.r()-1);
                 sol = bnb.solve();
                 LOG("+ nodes: " << n_nodes << endl);
                 ASSERT(sol.weight >= initial_lb.weight);

@@ -73,7 +73,7 @@ def run_test(solver, test, timeout):
             universal_newlines=True,
             preexec_fn=setlimits)
     try:
-        stdout_data, stderr_data = proc.communicate(timeout=timeout+100)
+        stdout_data, stderr_data = proc.communicate()
     except subprocess.TimeoutExpired:
         proc.terminate()
         stdout_data, stderr_data = proc.communicate()
